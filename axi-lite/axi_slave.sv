@@ -1,7 +1,7 @@
 
 
 module axi_slave(
-  
+
   input wire aclk,
   input wire areset,
   
@@ -48,8 +48,11 @@ module axi_slave(
       s_awready <= 1'b0;
       s_wready <= 1'b0;
       s_bresp <= 2'b00;
+      s_rvalid <= 1'b0;
+      s_arready <= 1'b0;
 
-      for(int i=0; i<128; i++) begin
+      for(int i=0; i<128; i++) 
+      begin
         mem[i] <= 32'h00000000;
       end
     end
@@ -70,6 +73,9 @@ module axi_slave(
             s_awready <= 1'b0;
             s_wready <= 1'b0;
             s_bresp <= 2'b00;  
+            s_bvalid <= 1'b0;
+            s_rvalid <= 1'b0;
+            s_arready <= 1'b0;
         end
       end
 
@@ -98,18 +104,18 @@ module axi_slave(
 
       write_mem: begin
         if(waddr <= 32'h7F) begin
-            slv_status = 2'b00;
+            slv_status <= 2'b00;
             mem[waddr] <= wdata;
             state <= send_write_resp;
         end
         else begin
-            slv_status = 2'b11;
+            slv_status <= 2'b11;
             state <= send_write_resp;
         end
       end
 
       get_read_addr: begin
-        if(s_wvalid == 1'b1) begin
+        if(s_arvalid == 1'b1) begin
             raddr <= s_araddr;
             s_arready <= 1'b0;
             state <= fetch_data;
