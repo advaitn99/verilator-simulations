@@ -7,9 +7,10 @@
 #include <chrono>
 #include <thread>
 #include <fstream>
+#include <queue>
 
 #define MAX_SIM_TIME 2000
-#define NUM_TESTS    5
+#define NUM_TESTS    50
 
 vluint64_t sim_time = 0;
 int num_test = 0;
@@ -42,13 +43,9 @@ class transaction
 class RandomNumberGenerator {
 private:
     std::mt19937 engine;
-    // The distribution is set when 'generate' is called, or you can store a specific one
 public:
-    RandomNumberGenerator() : engine(std::chrono::system_clock::now().time_since_epoch().count()) {
-        // Seed the engine using the current time
-    }
+    RandomNumberGenerator() : engine(std::chrono::system_clock::now().time_since_epoch().count()) {}
 
-    // Function to generate an integer within a specified range [min, max]
     int generate_int(int min, int max) {
         std::uniform_int_distribution<int> dist(min, max);
         return dist(engine);
@@ -66,9 +63,9 @@ class generator
         transaction* generate_sequence()
         {
             tx->op     = rng.generate_int(0,1);
-            tx->awaddr = rng.generate_int(0,100);
+            tx->awaddr = rng.generate_int(80,100);
             tx->wdata  = rng.generate_int(1,20);
-            tx->araddr = rng.generate_int(0,100);
+            tx->araddr = rng.generate_int(80,100);
 
             std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
 
@@ -228,23 +225,27 @@ class  monitor
     private:
         Vaxi_slave *dut;
         transaction *t1 = new transaction();
+        transaction *t3;
+        std::queue<transaction*> &mon_to_scb;
 
     public:
-        monitor(Vaxi_slave *dut)
+        monitor(Vaxi_slave *dut, std::queue<transaction*> &mon_to_scb): dut(dut), mon_to_scb(mon_to_scb)
         {
-            this->dut = dut;
+            //this->dut = dut;
         }
 
         void monitor_dut(transaction *t2)
         {
             if(t2->op == 1)
             {                
+                t1->op = t2->op;
                 /* store write address */
                 t1->awaddr = t2->awaddr;
                 t1->wdata = t2->wdata;
 
 
                 t1->bresp = dut->s_bresp;
+                mon_to_scb.push(t1);
                 
                 std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
                 if (logfile.is_open()) 
@@ -264,10 +265,13 @@ class  monitor
             }
             else
             {
+                t1->op = t2->op;
                 t1->araddr = t2->araddr;
 
                 t1->rdata  = dut->s_rdata;
                 t1->rresp = dut->s_rresp;
+                mon_to_scb.push(t1);
+
                 std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
                 if (logfile.is_open()) 
                 {
@@ -290,6 +294,92 @@ class  monitor
 };
 
 
+class scoreboard
+{
+    private:
+        transaction *trans;
+        std::queue<transaction*> &mon_to_scb;
+        uint32_t mem[128] = {0};
+
+    public:
+
+        scoreboard(std::queue<transaction*> &mon_to_scb): mon_to_scb(mon_to_scb) {}
+
+        void scb_check()
+        {
+            
+            if(!mon_to_scb.empty())
+            {
+                trans = mon_to_scb.front();
+                mon_to_scb.pop();
+                if(trans->op == 1)
+                {
+                    if(trans->bresp == 0)
+                    {
+                        if(trans->rdata == mem[trans->araddr])
+                        {
+                            std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
+                            if (logfile.is_open()) 
+                            {
+                                logfile << "[SCB]: WRITE DATA SUCCESS" << std::endl;
+                                logfile.close();
+                                mem[trans->awaddr] = trans->wdata;
+                            } else 
+                            {
+                                std::cerr << "Error: Unable to open log file." << std::endl;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
+                        if (logfile.is_open()) 
+                        {
+                            logfile << "[SCB]: WRITE DATA ERROR: "<<(int)trans->bresp<<std::endl;
+                            logfile.close();
+                        } else 
+                        {
+                            std::cerr << "Error: Unable to open log file." << std::endl;
+                        }
+                    }
+                }
+                else
+                {
+                    if(trans->rresp == 0)
+                    {
+                        std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
+                        if(trans->rdata == mem[trans->araddr])
+                        {
+                            if (logfile.is_open()) 
+                            {
+                                logfile << "[SCB]: READ DATA MATCHED"<<std::endl;
+                                logfile.close();
+                            } else 
+                            {
+                                std::cerr << "Error: Unable to open log file." << std::endl;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
+                        if (logfile.is_open()) 
+                        {
+                            logfile << "[SCB]: READ DATA ERROR: "<<(int)trans->rresp<<std::endl;
+                            logfile.close();
+                        } else 
+                        {
+                            std::cerr << "Error: Unable to open log file." << std::endl;
+                        }
+                    }
+
+                }
+
+            }
+        }
+};
+
+
 int main(int argc, char** argv, char** env) {
     dut = new Vaxi_slave;
     Verilated::traceEverOn(true);
@@ -297,10 +387,13 @@ int main(int argc, char** argv, char** env) {
     dut->trace(m_trace, 5);
     m_trace->open("waveform.vcd");
 
+    std::queue<transaction*> mon_to_scb;
+
     transaction *t;
     generator *g = new generator();
     driver *d = new driver(dut);
-    monitor *m = new monitor(dut);
+    monitor *m = new monitor(dut, mon_to_scb);
+    scoreboard *s = new scoreboard(mon_to_scb);
 
     dut->aclk = 0;
 
@@ -330,6 +423,7 @@ int main(int argc, char** argv, char** env) {
 
         d->drive(t);
         m->monitor_dut(t);
+        s->scb_check();
 
         num_test++;
     }
