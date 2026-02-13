@@ -42,7 +42,7 @@ module axi_slave(
 
   reg [31:0] mem[128];
   
-  always @(posedge aclk or negedge areset) begin
+  always_ff @(posedge aclk or negedge areset) begin
     if(areset == 1'b0) begin
       state <= idle;
       s_awready <= 1'b0;

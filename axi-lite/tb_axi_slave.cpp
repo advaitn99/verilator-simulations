@@ -428,6 +428,16 @@ int main(int argc, char** argv, char** env) {
         num_test++;
     }
     
+    logfile.open("sim_logs.log", std::ios_base::out | std::ios_base::app);
+    if (logfile.is_open()) 
+    {
+        logfile << "###### SIMULATION ENDED #######" << std::endl;
+        logfile.close();
+    } else 
+    {
+        std::cerr << "Error: Unable to open log file." << std::endl;
+    }
+
     m_trace->close();
     delete dut;
     exit(EXIT_SUCCESS);
