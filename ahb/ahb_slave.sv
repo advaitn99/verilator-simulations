@@ -24,9 +24,8 @@ module ahb_slave(
                data_read_read       = 4;
 
     integer burst_count = 0;
-    reg first = 0;
-    reg [31:0] next_addr = 0;
-    reg [31:0] ret_addr = 0;
+    reg [31:0] next_addr;
+    reg [31:0] ret_addr;
     reg [7:0] boundary = 0;
 
 
@@ -48,9 +47,9 @@ module ahb_slave(
         begin
             s_ahb_hready = 1'b0;
             burst_count = 0;
-            first = 0;
             s_ahb_hresp = `OKAY;
             next_state = control_phase;
+            ret_addr = 0;
         end
 
         control_phase:
@@ -106,33 +105,246 @@ module ahb_slave(
             case(s_ahb_hburst)
 
             `SINGLE: begin
+                ret_addr = wr_single_tr(s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                next_state = idle;
+                s_ahb_hresp = `OKAY;
             end
 
             `INCR: begin
+                ret_addr = wr_incr_tr(s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count < 32) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
             end
 
             `WRAP4: begin
+
+                boundary = get_boundary(s_ahb_hsize, s_ahb_hburst);
+
+                ret_addr = wr_wrap_tr(boundary, s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 2) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+
             end
 
             `INCR4: begin
+                ret_addr = wr_incr_tr(s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 2) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
             end
 
             `WRAP8: begin
+                boundary = get_boundary(s_ahb_hsize, s_ahb_hburst);
+
+                ret_addr = wr_wrap_tr(boundary, s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 6) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
             end
 
             `INCR8: begin
+                ret_addr = wr_incr_tr(s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 6) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
             end
 
             `WRAP16: begin
+                boundary = get_boundary(s_ahb_hsize, s_ahb_hburst);
+
+                ret_addr = wr_wrap_tr(boundary, s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 14) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
             end
 
             `INCR16: begin
+                ret_addr = wr_incr_tr(s_ahb_hsize, next_addr, s_ahb_hwdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 14) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
             end
             endcase
         end
 
         data_read_read:
         begin
+            case(s_ahb_hburst)
+
+            `SINGLE: begin
+                ret_addr = rd_single_tr(s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                next_state = idle;
+                s_ahb_hresp = `OKAY;
+            end
+
+            `INCR: begin
+                ret_addr = rd_incr_tr(s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count < 32) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+            end
+
+            `WRAP4: begin
+                boundary = get_boundary(s_ahb_hsize, s_ahb_hburst);
+                ret_addr = rd_wrap_tr(boundary, s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 2) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+            end
+
+            `INCR4: begin
+                ret_addr = rd_incr_tr(s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 2) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+            end
+
+            `WRAP8: begin
+                boundary = get_boundary(s_ahb_hsize, s_ahb_hburst);
+                ret_addr = rd_wrap_tr(boundary, s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 6) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+            end
+
+            `INCR8: begin
+                ret_addr = rd_incr_tr(s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 6) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+            end
+
+            `WRAP16: begin
+                boundary = get_boundary(s_ahb_hsize, s_ahb_hburst);
+                ret_addr = rd_wrap_tr(boundary, s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 14) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+            end
+
+            `INCR16: begin
+                ret_addr = rd_incr_tr(s_ahb_hsize, next_addr, s_ahb_rdata);
+                s_ahb_hready = 1'b1;
+                s_ahb_hresp = `OKAY;
+
+                if(burst_count <= 14) begin
+                    burst_count = burst_count + 1;
+                    next_state = control_phase;
+                end
+                else begin
+                    burst_count = 0;
+                    next_state = idle;
+                end
+            end
+            endcase
         end
         endcase
     end

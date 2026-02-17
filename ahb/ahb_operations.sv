@@ -20,6 +20,8 @@ function bit [31:0] wr_single_tr(input bit [2:0] hsize, bit [31:0] wr_addr, bit 
         mem[wr_addr + 3] = hwdata[31:24];
     end
 
+    default: /* NOP */;
+
     endcase
 
     return wr_addr;
@@ -51,6 +53,8 @@ function bit [31:0] wr_incr_tr(input bit [2:0] hsize, bit [31:0] wr_addr, bit [3
         next_addr = wr_addr + 4;
     end
 
+    default: /* NOP */;
+
     endcase
 
     return next_addr;
@@ -58,7 +62,7 @@ function bit [31:0] wr_incr_tr(input bit [2:0] hsize, bit [31:0] wr_addr, bit [3
 endfunction
 
 
-function bit [7:0] get_boundary(input bit [2:0] hsize, bit [2:0] hburst, bit [31:0] wr_addr);
+function bit [7:0] get_boundary(input bit [2:0] hsize, bit [2:0] hburst);
 
     bit [7:0] temp;
 
@@ -74,6 +78,8 @@ function bit [7:0] get_boundary(input bit [2:0] hsize, bit [2:0] hburst, bit [31
 
         `WRAP16: temp = 1*16;
 
+        default: /* NOP */;
+
         endcase
     end
 
@@ -86,6 +92,8 @@ function bit [7:0] get_boundary(input bit [2:0] hsize, bit [2:0] hburst, bit [31
         `WRAP8: temp = 2*8;
 
         `WRAP16: temp = 2*16;
+
+        default: /* NOP */;
 
         endcase
     end
@@ -100,8 +108,12 @@ function bit [7:0] get_boundary(input bit [2:0] hsize, bit [2:0] hburst, bit [31
 
         `WRAP16: temp = 4*16;
 
+        default: /* NOP */;
+
         endcase
     end
+
+    default: /* NOP */;
 
     endcase
 
@@ -180,6 +192,148 @@ function bit [31:0] wr_wrap_tr(input bit [7:0] boundary, bit [2:0] hsize, bit[31
 
         return addr3;
     end
+
+    default: /* NOP */;
+
+    endcase
+
+endfunction
+
+
+function bit [31:0] rd_single_tr(input bit [2:0] hsize, bit [31:0] rd_addr, output bit [31:0] rddata);
+
+    case(hsize)
+
+    `BYTE: begin
+        rddata[7:0] = mem[rd_addr];
+        return rd_addr;
+    end
+
+    `HALFWORD: begin
+        rddata[7:0] = mem[rd_addr];
+        rddata[15:8] = mem[rd_addr + 1];
+        return rd_addr;
+    end
+
+    `WORD: begin
+        rddata[7:0] = mem[rd_addr];
+        rddata[15:8] = mem[rd_addr + 1];
+        rddata[23:16] = mem[rd_addr + 2];
+        rddata[31:24] = mem[rd_addr + 3];
+        return rd_addr;
+    end
+
+    default: /* NOP */;
+
+    endcase
+endfunction
+
+
+function bit [31:0] rd_incr_tr(input bit [2:0] hsize, bit [31:0] rd_addr,output bit [31:0] rddata);
+    bit [31:0] next_addr;
+
+    case(hsize)
+
+    `BYTE: begin
+        rddata[7:0] = mem[rd_addr];
+        next_addr = rd_addr + 1;
+    end
+
+    `HALFWORD: begin
+        rddata[7:0] = mem[rd_addr];
+        rddata[15:8] = mem[rd_addr + 1];
+        next_addr = rd_addr + 2;
+    end
+
+    `WORD: begin
+        rddata[7:0] = mem[rd_addr];
+        rddata[15:8] = mem[rd_addr + 1];
+        rddata[23:16] = mem[rd_addr + 2];
+        rddata[31:24] = mem[rd_addr + 3];
+        next_addr = rd_addr + 4;
+    end
+
+    default: /* NOP */;
+
+    endcase
+
+    return next_addr;
+endfunction
+
+
+function bit [31:0] rd_wrap_tr(input bit [7:0] boundary, bit [2:0] hsize, bit[31:0] rd_addr,output bit [31:0] rddata);
+
+    bit [31:0] addr0, addr1, addr2, addr3;
+
+    case(hsize)
+
+    `BYTE: begin
+
+    rddata[7:0] = mem[rd_addr];
+
+    if((rd_addr + 1) % 32'(boundary) == 0)
+        addr0 = (rd_addr + 1) - 32'(boundary);
+    else
+        addr0 = (rd_addr + 1);
+
+        return addr0;
+    end
+
+    `HALFWORD: begin
+
+        rddata[7:0] = mem[rd_addr];
+
+        if((rd_addr + 1) % 32'(boundary) == 0)
+            addr0 = (rd_addr + 1) - 32'(boundary);
+        else
+            addr0 = (rd_addr + 1);
+
+        rddata[15:8] = mem[addr0];
+
+        if((addr0 + 1) % 32'(boundary) == 0)
+            addr1 = (addr0 + 1) - 32'(boundary);
+        else
+            addr1 = (addr0 + 1);    
+
+        return addr1;
+
+    end
+
+
+    `WORD: begin
+
+        rddata[7:0] = mem[rd_addr];
+
+        if((rd_addr + 1) % 32'(boundary) == 0)
+            addr0 = (rd_addr + 1) - 32'(boundary);
+        else
+            addr0 = (rd_addr + 1);
+
+        rddata[15:8] = mem[addr0];
+
+        if((addr0 + 1) % 32'(boundary) == 0)
+            addr1 = (addr0 + 1) - 32'(boundary);
+        else
+            addr1 = (addr0 + 1);    
+        
+        rddata[23:16] = mem[addr1];
+
+        if((addr1 + 1) % 32'(boundary) == 0)
+            addr2 = (addr1 + 1) - 32'(boundary);
+        else
+            addr2 = (addr1 + 1);
+
+        rddata[31:24] = mem[addr2];
+
+        if((addr2 + 1) % 32'(boundary) == 0)
+            addr3 = (addr2 + 1) - 32'(boundary);
+        else
+            addr3 = (addr2 + 1);
+
+        return addr3;
+    end
+
+    default: /* NOP */;
 
     endcase
 
