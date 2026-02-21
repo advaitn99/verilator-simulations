@@ -6,7 +6,7 @@
 
 /* Subordinate response */
 `define OKAY        2'b00
-`define ERROR       2'b01
+`define ERROR       2'b11
 
 /* Bus widths */
 `define ADDR_WIDTH  32

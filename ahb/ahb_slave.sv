@@ -23,7 +23,7 @@ module ahb_slave(
                data_write_phase     = 3,
                data_read_read       = 4;
 
-    integer burst_count = 0;
+    reg [31:0] burst_count, next_burst_count;
     reg [31:0] next_addr;
     reg [31:0] ret_addr;
     reg [7:0] boundary = 0;
@@ -36,6 +36,7 @@ module ahb_slave(
         end
         else begin
             state <= next_state;
+            burst_count <= next_burst_count;
         end
     end
 
@@ -46,8 +47,8 @@ module ahb_slave(
         idle:
         begin
             s_ahb_hready = 1'b0;
-            burst_count = 0;
-            s_ahb_hresp = `OKAY;
+            next_burst_count = 32'b0;
+            s_ahb_hresp = 0;
             next_state = control_phase;
             ret_addr = 0;
         end
@@ -55,6 +56,7 @@ module ahb_slave(
         control_phase:
         begin
             s_ahb_hready = 1'b0;
+            s_ahb_hresp = 0;
 
             if(hresetn && s_ahb_hsel && s_ahb_hwrite) begin
                 if(s_ahb_haddr < 256) begin
@@ -85,6 +87,7 @@ module ahb_slave(
         begin
             if(s_ahb_htrans == `NONSEQ) begin
                 next_addr = s_ahb_haddr;
+                next_burst_count = 32'b0;
                 if(s_ahb_hwrite)
                     next_state = data_write_phase;
                 else
@@ -117,11 +120,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count < 32) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -135,14 +138,13 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 2) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
-
             end
 
             `INCR4: begin
@@ -151,11 +153,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 2) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -168,11 +170,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 6) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -183,11 +185,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 6) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -200,11 +202,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 14) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -215,11 +217,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 14) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -243,11 +245,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count < 32) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -259,11 +261,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 2) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -274,11 +276,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 2) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -290,11 +292,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 6) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -305,11 +307,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 6) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -321,11 +323,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 14) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
@@ -336,11 +338,11 @@ module ahb_slave(
                 s_ahb_hresp = `OKAY;
 
                 if(burst_count <= 14) begin
-                    burst_count = burst_count + 1;
+                    next_burst_count = burst_count + 1;
                     next_state = control_phase;
                 end
                 else begin
-                    burst_count = 0;
+                    next_burst_count = 0;
                     next_state = idle;
                 end
             end
