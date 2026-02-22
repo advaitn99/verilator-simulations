@@ -16,7 +16,10 @@ module ahb_slave(
     output reg s_ahb_hready
 );
 
+    /* State machine variables */
     reg [2:0] state, next_state;
+
+    /* States */
     localparam idle                 = 0,
                control_phase        = 1,
                addr_phase           = 2,
@@ -24,10 +27,9 @@ module ahb_slave(
                data_read_read       = 4;
 
     reg [31:0] burst_count, next_burst_count;
-    reg [31:0] next_addr;
+    reg [31:0] next_addr/*verilator public*/;
     reg [31:0] ret_addr;
     reg [7:0] boundary = 0;
-
 
 
     always_ff @(posedge hclk or negedge hresetn) begin
@@ -39,6 +41,7 @@ module ahb_slave(
             burst_count <= next_burst_count;
         end
     end
+
 
     always_comb begin
 

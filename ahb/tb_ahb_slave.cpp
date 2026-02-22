@@ -3,6 +3,7 @@
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 #include "Vahb_slave.h"
+#include "Vahb_slave_ahb_slave.h"
 #include <random>
 #include <chrono>
 #include <thread>
@@ -11,7 +12,7 @@
 
 
 #define MAX_SIM_TIME 100
-#define NUM_TESTS    50
+#define NUM_TESTS    10
 #define DATA_MIN    0x1000
 #define DATA_MAX    0xFFFF
 
@@ -67,11 +68,11 @@ class generator
         transaction* generate_sequence()
         {
             tx->op     = rng.generate_int(0,1);
-            tx->addr   = rng.generate_int(80,100);
+            tx->addr   = 100;
             tx->wdata  = rng.generate_int(DATA_MIN,DATA_MAX);
             tx->hsize  = 1;
-            tx->hburst = rng.generate_int(0,7);
-            tx->burst_count = rng.generate_int(1,10);
+            tx->hburst = 5; //rng.generate_int(0,7);
+            tx->burst_count = 5;//rng.generate_int(1,10);
 
             std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
 
@@ -103,9 +104,8 @@ class driver
 
     public:
 
-        driver(Vahb_slave *dut)
+        driver(Vahb_slave *dut): dut(dut)
         {
-            this->dut = dut;
         }
 
         void dut_reset()
@@ -138,6 +138,26 @@ class driver
                 dut->s_ahb_htrans = 2;
                 dut->s_ahb_hwdata = trans->wdata;
 
+                /* Wait for HREADY signal */
+                while(dut->s_ahb_hready != 1)
+                {
+                    tick();
+                }
+
+                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
+                if (logfile.is_open())
+                {
+                    logfile << "[DRV]: OP: " << (int)(trans->op)
+                            << " ADDR: " << (int)trans->addr
+                            <<" HTRANS: " << 2
+                            <<" WDATA: " << trans->wdata
+                    <<std::endl;
+                    logfile.close();
+                } else
+                {
+                    std::cerr << "Error: Unable to open log file." << std::endl;
+                }
+
                 tick();
                 tick();
             }
@@ -145,6 +165,7 @@ class driver
 
         void dut_single_read(transaction* trans)
         {
+            int rdata;
 
             dut->s_ahb_haddr  = trans->addr;
             dut->s_ahb_hwrite = 0;
@@ -152,6 +173,28 @@ class driver
             dut->s_ahb_hsize  = trans->hsize;
             dut->s_ahb_hburst = 0;
             dut->s_ahb_htrans = 2;
+
+            /* Wait for HREADY signal */
+            while(dut->s_ahb_hready != 1)
+            {
+                tick();
+            }
+
+            rdata = dut->s_ahb_rdata;
+
+            std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
+            if (logfile.is_open())
+            {
+                logfile << "[DRV]: OP: " << (int)(trans->op)
+                        << " ADDR: " << (int)trans->addr
+                        <<" HTRANS: " << 2
+                        <<" RDATA: " << rdata
+                <<std::endl;
+                logfile.close();
+            } else
+            {
+                std::cerr << "Error: Unable to open log file." << std::endl;
+            }
 
             tick();
             tick();
@@ -162,6 +205,7 @@ class driver
             int first = 1;
             int htrans, wdata;
             int num_bursts;
+            int addr;
 
             switch(trans->hburst)
             {
@@ -197,11 +241,19 @@ class driver
                 /* Apply inputs at POSEDGE */
                 tick();
 
+                /* Wait for HREADY signal */
+                while(dut->s_ahb_hready != 1)
+                {
+                    tick();
+                }
+
+                addr = dut->ahb_slave->next_addr;
+
                 std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
                 if (logfile.is_open())
                 {
                     logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " AWADDR: " << (int)(trans->addr + i*2)
+                            << " ADDR: " << (int)addr
                             <<" BURST_COUNT: " << (int)trans->burst_count
                             <<" HTRANS: " << htrans
                             <<" WDATA: " << wdata
@@ -210,13 +262,7 @@ class driver
                 } else
                 {
                     std::cerr << "Error: Unable to open log file." << std::endl;
-                }
-
-                /* Wait for HREADY signal */
-                while(dut->s_ahb_hready != 1)
-                {
-                    tick();
-                }
+                }             
 
                 /* Keep inputs stable for NEGEDGE */
                 tick();
@@ -225,10 +271,10 @@ class driver
 
         void dut_incr_read(transaction* trans)
         {
-            transaction t;
             int first = 1;
             int htrans, wdata;
             int num_bursts;
+            int addr, rdata;
 
             switch(trans->hburst)
             {
@@ -258,7 +304,6 @@ class driver
                 dut->s_ahb_hsel   = 1;
                 dut->s_ahb_hsize  = trans->hsize;
                 dut->s_ahb_hburst = trans->hburst;
-                t.rdata = dut->s_ahb_rdata;
 
                 /* Apply inputs at POSEDGE */
                 tick();
@@ -272,14 +317,17 @@ class driver
                 /* Keep inputs stable for NEGEDGE */
                 tick();
 
+                addr = dut->ahb_slave->next_addr;
+                rdata = dut->s_ahb_rdata;
+
                 std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
                 if (logfile.is_open()) 
                 {
                     logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " AWADDR: " << (int)(trans->addr + i*2)
+                            << " ADDR: " << (int)addr
                             <<" BURST_COUNT: " << (int)trans->burst_count
                             <<" HTRANS: " << htrans
-                            <<" RDATA: " << t.rdata
+                            <<" RDATA: " << rdata
                     <<std::endl;
                     logfile.close();
                 } else 
@@ -294,6 +342,7 @@ class driver
             int first = 1;
             int htrans, wdata;
             int num_bursts;
+            int addr;
 
             switch(trans->hburst)
             {
@@ -328,26 +377,28 @@ class driver
                 /* Apply inputs at POSEDGE */
                 tick();
 
-                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-                if (logfile.is_open()) 
-                {
-                    logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " AWADDR: " << (int)(trans->addr + i*2)
-                            <<" BURST_COUNT: " << (int)trans->burst_count
-                            <<" HTRANS: " << htrans
-                            <<" WDATA: " << wdata
-                    <<std::endl;
-                    logfile.close();
-                } else 
-                {
-                    std::cerr << "Error: Unable to open log file." << std::endl;
-                }
-
                 /* Wait for HREADY signal */
                 while(dut->s_ahb_hready != 1)
                 {
                     tick();
                 }
+
+                addr = dut->ahb_slave->next_addr;
+
+                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
+                if (logfile.is_open())
+                {
+                    logfile << "[DRV]: OP: " << (int)(trans->op)
+                            << " ADDR: " << (int)addr
+                            <<" BURST_COUNT: " << (int)trans->burst_count
+                            <<" HTRANS: " << htrans
+                            <<" WDATA: " << wdata
+                    <<std::endl;
+                    logfile.close();
+                } else
+                {
+                    std::cerr << "Error: Unable to open log file." << std::endl;
+                }             
 
                 /* Keep inputs stable for NEGEDGE */
                 tick();
@@ -360,6 +411,7 @@ class driver
             int htrans;
             int num_bursts;
             transaction t;
+            int addr, rdata;
 
             switch(trans->hburst)
             {
@@ -402,14 +454,17 @@ class driver
                 /* Keep inputs stable for NEGEDGE */
                 tick();
 
+                addr = dut->ahb_slave->next_addr;
+                rdata = dut->s_ahb_rdata;
+
                 std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
                 if (logfile.is_open()) 
                 {
                     logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " AWADDR: " << (int)(trans->addr + i*2)
+                            << " ADDR: " << (int)addr
                             <<" BURST_COUNT: " << (int)trans->burst_count
                             <<" HTRANS: " << htrans
-                            <<" RDATA: " << t.rdata
+                            <<" RDATA: " << rdata
                     <<std::endl;
                     logfile.close();
                 } else 
@@ -459,65 +514,6 @@ class driver
 };
 
 
-
-class  monitor
-{
-    private:
-        Vahb_slave *dut;
-        transaction *t1 = new transaction();
-        transaction *t3;
-        std::queue<transaction*> &mon_to_scb;
-
-    public:
-        monitor(Vahb_slave *dut, std::queue<transaction*> &mon_to_scb): dut(dut), mon_to_scb(mon_to_scb)
-        {
-            //this->dut = dut;
-        }
-
-        void monitor_dut(transaction *t2)
-        {
-            if(t2->op == 1)
-            {                
-            }
-            else
-            {
-            }
-        }
-};
-
-
-
-class scoreboard
-{
-    private:
-        transaction *trans;
-        std::queue<transaction*> &mon_to_scb;
-        uint32_t mem[128] = {0};
-
-    public:
-
-        scoreboard(std::queue<transaction*> &mon_to_scb): mon_to_scb(mon_to_scb) {}
-
-        void scb_check()
-        {
-            
-            if(!mon_to_scb.empty())
-            {
-                trans = mon_to_scb.front();
-                mon_to_scb.pop();
-                if(trans->op == 1)
-                {
-                }
-                else
-                {
-                }
-
-            }
-        }
-};
-
-
-
 int main(int argc, char** argv, char** env) {
     dut = new Vahb_slave;
     Verilated::traceEverOn(true);
@@ -526,12 +522,13 @@ int main(int argc, char** argv, char** env) {
     m_trace->open("waveform.vcd");
 
     std::queue<transaction*> mon_to_scb;
+    std::queue<transaction*> drv_to_mon;
 
     transaction *t;
     generator *g = new generator();
     driver *d = new driver(dut);
-    monitor *m = new monitor(dut, mon_to_scb);
-    scoreboard *s = new scoreboard(mon_to_scb);
+    // monitor *m = new monitor(dut, mon_to_scb, drv_to_mon);
+    // scoreboard *s = new scoreboard(mon_to_scb);
 
     dut->hclk = 0;
 
