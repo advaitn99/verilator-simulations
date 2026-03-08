@@ -23,11 +23,17 @@ make verilate
 ```
 
 ```
-make  build
+make build
 ```
 
 ```
 make waves
+```
+
+4. The build data can be cleaned using following command:
+
+```
+make clean
 ```
 
 ## Post simulation
@@ -37,5 +43,9 @@ make waves
     **Figure 1:** AHB slave simulation waveform
     ![Waveform for AHB slave simulation](./ahb_slave_waveform.png)
 
+    **Figure 2:** AXI-lite slave simulation waveform
+    ![Waveform for AXI-lite slave simulation](./axi_slave_waveform.png)
 
-2. The simulation logs are printed in **sim_logs.log** file.
+2. The simulation logs are printed in **sim_logs.log** file. 
+
+3. [Example log file](./sim_logs.log) for AHB-slave simulation
