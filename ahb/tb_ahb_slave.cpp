@@ -71,8 +71,8 @@ class generator
             tx->addr   = rng.generate_int(20, 50) * 2;
             tx->wdata  = rng.generate_int(DATA_MIN,DATA_MAX);
             tx->hsize  = 1;
-            tx->hburst = 4;
-            tx->burst_count = 5;
+            tx->hburst = rng.generate_int(0,7);
+            tx->burst_count =rng.generate_int(2,10);
 
             std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
 
