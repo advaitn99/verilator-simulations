@@ -11,6 +11,7 @@ The Testbench is implemented with layered architecture similar to UVM style test
 - GCC: Compiling C++ source code.
 - Cmake: For building Makefiles
 
+**Note:** Tested with Ubuntu 20.04 LTS
 
 ## Procedure
 
