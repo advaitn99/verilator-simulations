@@ -65,3 +65,14 @@ make clean
 2. The simulation logs are printed in **sim_logs.log** file. 
 
 3. [Example log file](./sim_logs.log) for AHB-slave simulation
+
+4. Glimpse of simulation logs:
+
+```text
+[SIM]: ###### Reset DUT #######
+[GEN]: OP: 1 ADDR: 70 WDATA: 25 HSIZE: 1 HBURST: 4 NUM BURSTS: 4
+[DRV]: OP: 1 ADDR: 70 HTRANS: 2 WDATA: 78
+[MON]: OP: 1 ADDR: 70 WDATA: 78 RDATA: 0 HRESP: 0
+[SCO]: Scoreboard report Operation: 1 TOTAL BURSTS RECEIVED: 8 PASS: 8 FAIL: 0
+[SIM]: ###### SIMULATION ENDED #######
+```
