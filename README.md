@@ -6,11 +6,27 @@ The Testbench is implemented with layered architecture similar to UVM style test
 
 ## Software requirements
 
-- verilator: For design verification and simulation
-- GTKWave: Timing diagram visualization
-- GCC: Compiling C++ source code.
-- Cmake: For building Makefiles
+| Software | Description | Version Tested |
+|----------|-------------|-----------------|
+| Verilator | HDL simulation and verification | 4.216 |
+| GTKWave | Timing diagram visualization | 3.3.103 |
+| GCC | C++ compilation | 9.4.0 |
+| CMake | Build system generator | 4.2.1 |
+| Ubuntu | Linux distribution | 20.04 LTS |
 
+## Repository layout
+
+    ahb/             – AHB slave example
+    ├─ ahb_params.svh
+    ├─ ahb_operations.sv
+    ├─ ahb_slave.sv
+    ├─ tb_ahb_slave.cpp
+    └─ Makefile
+    
+    axi-lite/        – AXI‑Lite slave example
+    ├─ axi_slave.sv
+    ├─ tb_axi_slave.cpp
+    └─ Makefile
 
 ## Procedure
 
