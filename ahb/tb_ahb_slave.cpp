@@ -9,6 +9,7 @@
 #include <thread>
 #include <fstream>
 #include <queue>
+#include <string>
 
 
 #define MAX_SIM_TIME 100
@@ -29,6 +30,31 @@ void tick(void)
     m_trace->dump(sim_time);
     sim_time++;
 }
+
+
+class Logger {
+private:
+    std::string filename;
+    std::ofstream stream;
+
+public:
+    Logger(const std::string &fname) : filename(fname) {
+        stream.open(filename, std::ios_base::out | std::ios_base::app);
+        if (!stream.is_open()) {
+            std::cerr << "Error: Unable to open log file: " << filename << std::endl;
+        }
+    }
+
+    ~Logger() {
+        if (stream.is_open()) stream.close();
+    }
+
+    void log(const std::string &tag, const std::string &msg) {
+        if (stream.is_open()) {
+            stream << "[" << tag << "]: " << msg << std::endl;
+        }
+    }
+};
 
 
 class transaction
@@ -63,8 +89,11 @@ class generator
     private:
         transaction *tx = new transaction();
         RandomNumberGenerator rng;
+        Logger *logger;
 
     public:
+        generator(Logger *logger) : logger(logger) {}
+
         transaction* generate_sequence()
         {
             tx->op     = rng.generate_int(0,1);
@@ -74,22 +103,12 @@ class generator
             tx->hburst = rng.generate_int(0,7);
             tx->burst_count =rng.generate_int(2,10);
 
-            std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-
-            if (logfile.is_open()) 
-            {
-                logfile << "[GEN]: OP: " << (int)tx->op
-                        << " ADDR: " << (int)tx->addr
-                        << " WDATA: " << (int)tx->wdata
-                        << " HSIZE: " << (int)tx->hsize
-                        << " HBURST: " << (int)tx->hburst
-                        << " NUM BURSTS: " << (int)tx->burst_count
-                <<std::endl;
-                logfile.close();
-            } else 
-            {
-                std::cerr << "Error: Unable to open log file." << std::endl;
-            }
+            logger->log("GEN", "OP: " + std::to_string(tx->op)
+                + " ADDR: " + std::to_string(tx->addr)
+                + " WDATA: " + std::to_string(tx->wdata)
+                + " HSIZE: " + std::to_string(tx->hsize)
+                + " HBURST: " + std::to_string(tx->hburst)
+                + " NUM BURSTS: " + std::to_string(tx->burst_count));
 
             return tx;
         }
@@ -101,11 +120,11 @@ class monitor
     private:
         Vahb_slave *dut;
         std::queue<transaction*> &mon_to_scb;
-        
+        Logger *logger;
 
     public:
 
-    monitor(Vahb_slave *dut, std::queue<transaction*> mon_to_scb): dut(dut), mon_to_scb(mon_to_scb)
+    monitor(Vahb_slave *dut, std::queue<transaction*> &mon_to_scb, Logger *logger): dut(dut), mon_to_scb(mon_to_scb), logger(logger)
     {
 
     }
@@ -119,20 +138,11 @@ class monitor
         t->wdata = trans->wdata;
         t->rdata = dut->s_ahb_rdata;
 
-        std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-        if (logfile.is_open())
-        {
-            logfile << "[MON]: OP: " << (int)(t->op)
-                    << " ADDR: " << (int)t->addr
-                    << " WDATA: " << (int)t->wdata
-                    << " RDATA: " << (int)t->rdata
-                    << " HRESP: " << (int)t->hresp
-            <<std::endl;
-            logfile.close();
-        } else
-        {
-            std::cerr << "Error: Unable to open log file." << std::endl;
-        }
+        logger->log("MON", "OP: " + std::to_string(t->op)
+            + " ADDR: " + std::to_string(t->addr)
+            + " WDATA: " + std::to_string(t->wdata)
+            + " RDATA: " + std::to_string(t->rdata)
+            + " HRESP: " + std::to_string(t->hresp));
 
         mon_to_scb.push(t);
     }
@@ -146,10 +156,11 @@ class driver
         Vahb_slave *dut;
         RandomNumberGenerator rng_drv;
         monitor *m;
+        Logger *logger;
 
     public:
 
-        driver(Vahb_slave *dut, monitor *m): dut(dut), m(m)
+        driver(Vahb_slave *dut, monitor *m, Logger *logger): dut(dut), m(m), logger(logger)
         {
         }
 
@@ -189,19 +200,10 @@ class driver
                     tick();
                 }
 
-                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-                if (logfile.is_open())
-                {
-                    logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " ADDR: " << (int)trans->addr
-                            <<" HTRANS: " << 2
-                            <<" WDATA: " << trans->wdata
-                    <<std::endl;
-                    logfile.close();
-                } else
-                {
-                    std::cerr << "Error: Unable to open log file." << std::endl;
-                }
+                logger->log("DRV", "OP: " + std::to_string(trans->op)
+                    + " ADDR: " + std::to_string(trans->addr)
+                    + " HTRANS: 2"
+                    + " WDATA: " + std::to_string(trans->wdata));
 
                 m->monitor_dut(trans);
 
@@ -230,18 +232,9 @@ class driver
 
             rdata = dut->s_ahb_rdata;
 
-            std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-            if (logfile.is_open())
-            {
-                logfile << "[DRV]: OP: " << (int)(trans->op)
-                        << " ADDR: " << (int)trans->addr
-                        <<" HTRANS: " << 2
-                <<std::endl;
-                logfile.close();
-            } else
-            {
-                std::cerr << "Error: Unable to open log file." << std::endl;
-            }
+            logger->log("DRV", "OP: " + std::to_string(trans->op)
+                + " ADDR: " + std::to_string(trans->addr)
+                + " HTRANS: 2");
 
             m->monitor_dut(trans);
 
@@ -301,19 +294,10 @@ class driver
                 trans->addr = addr; 
                 trans->wdata = wdata;               
 
-                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-                if (logfile.is_open())
-                {
-                    logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " ADDR: " << (int)addr
-                            <<" HTRANS: " << htrans
-                            <<" WDATA: " << wdata
-                    <<std::endl;
-                    logfile.close();
-                } else
-                {
-                    std::cerr << "Error: Unable to open log file." << std::endl;
-                }
+                logger->log("DRV", "OP: " + std::to_string(trans->op)
+                    + " ADDR: " + std::to_string(addr)
+                    + " HTRANS: " + std::to_string(htrans)
+                    + " WDATA: " + std::to_string(wdata));
 
                 t->addr = trans->addr;
                 t->op = trans->op;
@@ -378,18 +362,9 @@ class driver
                 rdata = dut->s_ahb_rdata;
                 trans->addr = addr;
 
-                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-                if (logfile.is_open()) 
-                {
-                    logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " ADDR: " << (int)addr
-                            <<" HTRANS: " << htrans
-                    <<std::endl;
-                    logfile.close();
-                } else 
-                {
-                    std::cerr << "Error: Unable to open log file." << std::endl;
-                }
+                logger->log("DRV", "OP: " + std::to_string(trans->op)
+                    + " ADDR: " + std::to_string(addr)
+                    + " HTRANS: " + std::to_string(htrans));
 
                 t->addr = trans->addr;
                 t->op   = trans->op;
@@ -454,19 +429,10 @@ class driver
                 trans->addr = addr; 
                 trans->wdata = wdata;               
 
-                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-                if (logfile.is_open())
-                {
-                    logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " ADDR: " << (int)addr
-                            <<" HTRANS: " << htrans
-                            <<" WDATA: " << wdata
-                    <<std::endl;
-                    logfile.close();
-                } else
-                {
-                    std::cerr << "Error: Unable to open log file." << std::endl;
-                }
+                logger->log("DRV", "OP: " + std::to_string(trans->op)
+                    + " ADDR: " + std::to_string(addr)
+                    + " HTRANS: " + std::to_string(htrans)
+                    + " WDATA: " + std::to_string(wdata));
 
                 t->addr = trans->addr;
                 t->op   = trans->op;
@@ -528,18 +494,9 @@ class driver
                 rdata = dut->s_ahb_rdata;
                 trans->addr = addr;
 
-                std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-                if (logfile.is_open()) 
-                {
-                    logfile << "[DRV]: OP: " << (int)(trans->op)
-                            << " ADDR: " << (int)addr
-                            <<" HTRANS: " << htrans
-                    <<std::endl;
-                    logfile.close();
-                } else 
-                {
-                    std::cerr << "Error: Unable to open log file." << std::endl;
-                }
+                logger->log("DRV", "OP: " + std::to_string(trans->op)
+                    + " ADDR: " + std::to_string(addr)
+                    + " HTRANS: " + std::to_string(htrans));
                 
                 t->addr = trans->addr;
                 t->op   = trans->op;
@@ -596,10 +553,10 @@ class scoreboard
     private:
         uint8_t mem[256] = {0};
         std::queue<transaction*> &mon_to_scb;
-        
+        Logger *logger;
 
     public:
-        scoreboard(std::queue<transaction*> mon_to_scb): mon_to_scb(mon_to_scb)
+        scoreboard(std::queue<transaction*> &mon_to_scb, Logger *logger): mon_to_scb(mon_to_scb), logger(logger)
         {
         }
 
@@ -630,39 +587,21 @@ class scoreboard
                     }
                     else
                     {
-                        std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-                        if (logfile.is_open())
-                        {
-                            logfile << "[SCO]: READ DATA MISMATCH "
-                                    << " ADDR: " << (int)t->addr
-                                    << " RDATA received: " << (int)t->rdata
-                                    << " RDATA expected: " << (int)mem[t->addr]
-                                    << " HRESP: " << (int)t->hresp
-                            <<std::endl;
-                            logfile.close();
-                        } else
-                        {
-                            std::cerr << "Error: Unable to open log file." << std::endl;
-                        }
+                        logger->log("SCO", "READ DATA MISMATCH"
+                            " ADDR: " + std::to_string(t->addr)
+                            + " RDATA received: " + std::to_string(t->rdata)
+                            + " RDATA expected: " + std::to_string(mem[t->addr])
+                            + " HRESP: " + std::to_string(t->hresp));
                         fail++;
                     }
                 }
             }
 
-            std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-            if (logfile.is_open())
-            {
-                logfile << "[SCO]: Scoreboard report "
-                        << " Operation: " << op
-                        << " TOTAL BURSTS RECEIVED: " << (int)burst_count
-                        << " PASS: " << (int)pass
-                        << " FAIL: " << (int)fail
-                <<std::endl;
-                logfile.close();
-            } else
-            {
-                std::cerr << "Error: Unable to open log file." << std::endl;
-            }
+            logger->log("SCO", "Scoreboard report"
+                " Operation: " + std::to_string(op)
+                + " TOTAL BURSTS RECEIVED: " + std::to_string(burst_count)
+                + " PASS: " + std::to_string(pass)
+                + " FAIL: " + std::to_string(fail));
         }
 };
 
@@ -677,24 +616,17 @@ int main(int argc, char** argv, char** env) {
     std::queue<transaction*> mon_to_scb;
     //std::queue<transaction*> drv_to_mon;
 
+    Logger logger("sim_logs.log");
+
     transaction *t;
-    generator *g = new generator();
-    monitor *m = new monitor(dut, mon_to_scb);
-    driver *d = new driver(dut, m);
-    scoreboard *s = new scoreboard(mon_to_scb);
+    generator *g = new generator(&logger);
+    monitor *m = new monitor(dut, mon_to_scb, &logger);
+    driver *d = new driver(dut, m, &logger);
+    scoreboard *s = new scoreboard(mon_to_scb, &logger);
 
     dut->hclk = 0;
 
-    std::ofstream logfile("sim_logs.log", std::ios_base::out | std::ios_base::app);
-
-    if (logfile.is_open()) 
-    {
-        logfile << "###### Reset DUT #######" << std::endl;
-        logfile.close();
-    } else 
-    {
-        std::cerr << "Error: Unable to open log file." << std::endl;
-    }
+    logger.log("SIM", "###### Reset DUT #######");
     d->dut_reset();
 
     while(num_test < NUM_TESTS)
@@ -718,15 +650,7 @@ int main(int argc, char** argv, char** env) {
         num_test++;
     }
     
-    logfile.open("sim_logs.log", std::ios_base::out | std::ios_base::app);
-    if (logfile.is_open()) 
-    {
-        logfile << "###### SIMULATION ENDED #######" << std::endl;
-        logfile.close();
-    } else 
-    {
-        std::cerr << "Error: Unable to open log file." << std::endl;
-    }
+    logger.log("SIM", "###### SIMULATION ENDED #######");
 
     m_trace->close();
     delete dut;
